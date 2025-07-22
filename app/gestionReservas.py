@@ -1,13 +1,19 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QMessageBox, QHBoxLayout, QDialog
+    QPushButton, QMessageBox, QHBoxLayout, QDialog, QInputDialog
 )
 import sqlite3
 import os
 
+from app.dialogoCheckIn import DialogoCheckIn
+
 class GestionReservas(QWidget):
     def __init__(self, documento_usuario):
         super().__init__()
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        db_path = os.path.join(BASE_DIR, "db", "data_base.db")
+        self.conn = sqlite3.connect(db_path)
+        
         self.documento_usuario = documento_usuario
         self.setWindowTitle("Gestión de Reservas")
         self.resize(700, 400)
@@ -43,12 +49,10 @@ class GestionReservas(QWidget):
         self.cargar_reservas()
 
     def cargar_reservas(self):
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        db_path = os.path.join(BASE_DIR, "db", "data_base.db")
 
         try:
-            conexion = sqlite3.connect(db_path)
-            cursor = conexion.cursor()
+            cursor = self.conn.cursor()
+
 
             cursor.execute("""
                 SELECT numero_reserva, codigo_vuelo, fecha, sillas_preferencial, sillas_economica, total
@@ -56,7 +60,6 @@ class GestionReservas(QWidget):
                 ORDER BY fecha DESC
             """, (self.documento_usuario,))
             reservas = cursor.fetchall()
-            conexion.close()
 
             self.tabla.setRowCount(len(reservas))
             for row_idx, reserva in enumerate(reservas):
@@ -110,13 +113,96 @@ class GestionReservas(QWidget):
         numero_reserva = self.obtener_reserva_seleccionada()
         if not numero_reserva:
             return
-        # Aquí abrirías un diálogo para modificar la reserva (cantidad sillas, pasajeros, etc.)
-        # Puedes reutilizar o adaptar tu DialogoReserva para edición
-        QMessageBox.information(self, "Modificar", f"Funcionalidad modificar reserva #{numero_reserva} pendiente por implementar.")
+
+        confirm = QMessageBox.question(
+        self,
+        "Modificar reserva",
+        f"¿Deseas modificar la reserva #{numero_reserva}?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+)
+
+        if confirm != QMessageBox.StandardButton.Yes:
+
+            return
+
+        cursor = self.conn.cursor()
+
+        # Obtener datos actuales de la reserva
+        cursor.execute("SELECT codigo_vuelo, sillas_preferencial, sillas_economica FROM Reservas WHERE numero_reserva = ?", (numero_reserva,))
+        reserva = cursor.fetchone()
+
+        if not reserva:
+            QMessageBox.warning(self, "Error", "Reserva no encontrada.")
+            return
+
+        codigo_vuelo, prev_pref, prev_econ = reserva
+
+        # Obtener disponibilidad actual del vuelo
+        cursor.execute("SELECT sillas_preferencial, sillas_economica FROM Vuelos WHERE codigo_vuelo = ?", (codigo_vuelo,))
+        vuelo = cursor.fetchone()
+        if not vuelo:
+            QMessageBox.warning(self, "Error", "Vuelo no encontrado.")
+            return
+
+        sillas_disp_pref, sillas_disp_econ = vuelo
+
+        # InputDialog para nuevas cantidades
+        pref, ok1 = QInputDialog.getInt(self, "Modificar Preferencial", "¿Cuántas sillas preferenciales?", min=0, max=sillas_disp_pref + prev_pref)
+        if not ok1:
+            return
+        econ, ok2 = QInputDialog.getInt(self, "Modificar Económica", "¿Cuántas sillas económicas?", min=0, max=sillas_disp_econ + prev_econ)
+        if not ok2:
+            return
+
+        if pref + econ > 3:
+            QMessageBox.warning(self, "Límite excedido", "Máximo puedes reservar 3 sillas.")
+            return
+
+        # Calcular diferencia y actualizar disponibilidad del vuelo
+        nuevas_disp_pref = sillas_disp_pref + prev_pref - pref
+        nuevas_disp_econ = sillas_disp_econ + prev_econ - econ
+        cursor.execute("UPDATE Vuelos SET sillas_preferencial = ?, sillas_economica = ? WHERE codigo_vuelo = ?",
+                    (nuevas_disp_pref, nuevas_disp_econ, codigo_vuelo))
+
+        # Calcular nuevo total
+        total = pref * 850000 + econ * 235000
+
+        # Actualizar reserva
+        cursor.execute("""UPDATE Reservas 
+                        SET sillas_preferencial = ?, sillas_economica = ?, total = ?
+                        WHERE numero_reserva = ?""", (pref, econ, total, numero_reserva))
+
+        # Eliminar antiguos pasajeros
+        cursor.execute("DELETE FROM Pasajeros WHERE numero_reserva = ?", (numero_reserva,))
+
+        # Insertar nuevos pasajeros
+        for i in range(pref + econ):
+            nombre, ok1 = QInputDialog.getText(self, f"Pasajero {i+1}", "Nombre completo:")
+            if not ok1 or not nombre.strip():
+                QMessageBox.warning(self, "Cancelado", "Nombre no válido. Modificación cancelada.")
+                self.conn.rollback()
+                return
+            documento, ok2 = QInputDialog.getText(self, f"Pasajero {i+1}", "Número de documento:")
+            if not ok2 or not documento.strip():
+                QMessageBox.warning(self, "Cancelado", "Documento no válido. Modificación cancelada.")
+                self.conn.rollback()
+                return
+
+            cursor.execute("INSERT INTO Pasajeros (numero_reserva, nombre, documento) VALUES (?, ?, ?)",
+                        (numero_reserva, nombre.strip(), documento.strip()))
+
+        self.conn.commit()
+        QMessageBox.information(self, "Éxito", f"Reserva #{numero_reserva} actualizada correctamente.")
+        self.cargar_reservas()
+
 
     def realizar_checkin(self):
         numero_reserva = self.obtener_reserva_seleccionada()
         if not numero_reserva:
             return
-        # Aquí abrirías un diálogo para realizar check-in (mostrar info, acumular millas, elegir equipaje)
-        QMessageBox.information(self, "Check-in", f"Funcionalidad check-in para reserva #{numero_reserva} pendiente por implementar.")
+
+        dialogo = DialogoCheckIn(numero_reserva, self.conn, parent=self)
+        if dialogo.exec() == QDialog.DialogCode.Accepted:
+            QMessageBox.information(self, "Check-in", f"Check-in completado para reserva #{numero_reserva}")
+            # Puedes refrescar datos si es necesario
+

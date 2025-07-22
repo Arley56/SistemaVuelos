@@ -58,6 +58,8 @@ class Login(QWidget):
         Configura la interfaz gráfica de la ventana de inicio de sesión.
         Incluye el formulario de inicio de sesión y una imagen decorativa.
         """
+        
+        
         # Configuración general de la ventana
         self.setGeometry(100, 100, 800, 400)
         self.setWindowTitle("Login")
@@ -128,7 +130,7 @@ class Login(QWidget):
         form_layout.setContentsMargins(50, 30, 50, 30)
 
         # Campos del formulario
-        label_usuario = QLabel("Documento ahh:")
+        label_usuario = QLabel("Documento:")
         label_usuario.setFont(QFont("Arial", 12))
         self.user_input = QLineEdit()
 
@@ -161,6 +163,9 @@ class Login(QWidget):
         form_layout.addWidget(register_button)
         form_layout.addWidget(change_pass_button)
         form_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
+
+
 
         # === IMAGEN ===
         image_label = QLabel()

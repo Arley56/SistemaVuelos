@@ -1,7 +1,9 @@
 from PyQt6.QtWidgets import QDialog, QLabel, QPushButton, QLineEdit, QMessageBox
 import sqlite3
 import os
+import re
 from PyQt6.QtGui import QFont
+
 
 # Ruta base y conexión
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,7 +19,7 @@ class Registro(QDialog):
         
     def generar_formulario(self):
         self.setGeometry(100, 100, 450, 400)  # Ampliar un poco ventana
-        self.setWindowTitle("Registro de Usuario")
+        self.setWindowTitle("Registro ahh de Usuario")
         
         # Nombre completo
         nombre_label = QLabel("Nombre Completo:", self)
@@ -94,7 +96,22 @@ class Registro(QDialog):
             QMessageBox.warning(self, "Error", "Las contraseñas no coinciden.")
             return
         
-        # Puedes agregar validaciones extras para correo, documento, etc.
+        # resto de validaciones 
+        if not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', nombre):
+            QMessageBox.warning(self, "Error", "El nombre solo debe contener letras y espacios.")
+            return
+
+        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', correo):
+            QMessageBox.warning(self, "Error", "Ingrese un correo electrónico válido.")
+            return
+
+        if not documento.isdigit():
+            QMessageBox.warning(self, "Error", "El número de documento solo debe contener números.")
+            return
+
+        if len(password1) < 6:
+            QMessageBox.warning(self, "Error", "La contraseña debe tener al menos 6 caracteres.")
+            return
 
         try:
             # Insertar en la base de datos
