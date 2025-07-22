@@ -128,7 +128,7 @@ class Login(QWidget):
         form_layout.setContentsMargins(50, 30, 50, 30)
 
         # Campos del formulario
-        label_usuario = QLabel("Documento:")
+        label_usuario = QLabel("Documento ahh:")
         label_usuario.setFont(QFont("Arial", 12))
         self.user_input = QLineEdit()
 
