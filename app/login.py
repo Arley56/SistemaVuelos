@@ -22,13 +22,15 @@ from PyQt6.QtWidgets import (
     QWidget, QLabel, QPushButton, QLineEdit, QMessageBox, QCheckBox,
     QVBoxLayout, QHBoxLayout, QSpacerItem, QSizePolicy, QDialog
 )
-from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtGui import QFont, QPixmap, QIcon
 from PyQt6.QtCore import Qt
 import os
 import sqlite3
 
 from app.registro import Registro  # Clase para registrar nuevos usuarios
 from app.vistaVuelos import VistaVuelos  # Clase para mostrar vuelos disponibles
+from app.adminVuelos import AdminVuelos
+
 
 # Configuración de la base de datos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -63,7 +65,8 @@ class Login(QWidget):
         # Configuración general de la ventana
         self.setGeometry(100, 100, 800, 400)
         self.setWindowTitle("Login")
-        self.setStyleSheet("background-color: white;")
+        ruta_icono = os.path.join(BASE_DIR, "assets", "icono_image.ico")
+        self.setWindowIcon(QIcon(ruta_icono))
 
         # Aplicación de estilos CSS
         self.setStyleSheet("""
@@ -130,6 +133,7 @@ class Login(QWidget):
         form_layout.setContentsMargins(50, 30, 50, 30)
 
         # Campos del formulario
+        
         label_usuario = QLabel("Documento:")
         label_usuario.setFont(QFont("Arial", 12))
         self.user_input = QLineEdit()
@@ -198,9 +202,6 @@ class Login(QWidget):
             self.pass_input.setEchoMode(QLineEdit.EchoMode.Password)
 
     def iniciar_main_window(self):
-        """
-        Verifica las credenciales ingresadas y abre la ventana principal si son correctas.
-        """
         usuario = self.user_input.text().strip()
         clave = self.pass_input.text()
 
@@ -209,19 +210,33 @@ class Login(QWidget):
             return
 
         try:
-            cursor.execute("SELECT * FROM Usuarios WHERE documento = ? AND clave = ?", (usuario, clave))
+            cursor.execute("SELECT documento, rol FROM Usuarios WHERE documento = ? AND clave = ?", (usuario, clave))
             resultado = cursor.fetchone()
+            print("Resultado:", resultado)
 
             if resultado:
-                QMessageBox.information(self, "Login", "Inicio de sesión exitoso.")
+                documento_usuario, rol = resultado
+                print("Rol obtenido:", rol)
+
+                QMessageBox.information(self, "Login", f"Inicio de sesión exitoso como {rol}.")
                 self.is_logged_in = True
                 self.close()
-                self.open_main_window(usuario_documento=usuario)
+
+                if rol == "admin":
+                    print("Abriendo AdminVuelos")
+                    self.ventana_admin = AdminVuelos(conn=conexion)
+                    self.ventana_admin.show()
+                else:
+                    print("Abriendo VistaVuelos")
+                    self.ventana_usuario = VistaVuelos(documento_usuario)
+                    self.ventana_usuario.show()
             else:
                 QMessageBox.warning(self, "Login", "Usuario o contraseña incorrectos.")
-
         except sqlite3.Error as e:
             QMessageBox.critical(self, "Error", f"Error en la base de datos: {e}")
+
+
+
 
     def registrar_usuario(self):
         """

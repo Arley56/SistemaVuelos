@@ -4,89 +4,201 @@ from PyQt6.QtWidgets import (
     QSpinBox
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPalette, QBrush, QPixmap
 import sqlite3
 import os
 import random
 from app.gestionReservas import GestionReservas
+
+
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+    QPushButton, QTableWidget, QSizePolicy
+)
+from PyQt6.QtGui import QPixmap, QPalette, QBrush, QPainter, QColor, QLinearGradient
+from PyQt6.QtCore import Qt
+import os
+
 class VistaVuelos(QWidget):
     def __init__(self, documento_usuario):
         super().__init__()
-        self.documento_usuario = documento_usuario  # Guardar documento del usuario
-        self.setWindowTitle("Vuelos disponibles")
-        self.resize(800, 500)
-        
+        self.documento_usuario = documento_usuario
+        self.setWindowTitle("Vuelos Disponibles")
+        self.resize(1000, 600)
 
-        layout = QVBoxLayout(self)
-        self.setLayout(layout)
+        # Layout principal horizontal: Izquierda (form+tabla) - Derecha (imagen)
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(30, 30, 30, 30)
+        main_layout.setSpacing(40)
 
-        self.setStyleSheet("""
-            QLabel {
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QLineEdit {
-                padding: 4px;
-                font-size: 14px;
-            }
-            QPushButton {
-                padding: 5px;
-                font-size: 14px;
-                background-color: #004080;
-                color: white;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #0066cc;
-            }
-            QTableWidget {
-                font-size: 13px;
-                border: 1px solid #ccc;
-                gridline-color: #bbb;
-                selection-background-color: #a4c9ff;
-            }
-            QHeaderView::section {
-                background-color: #004080;
-                color: white;
-                font-weight: bold;
-                padding: 5px;
-            }
-        """)
+        # --- IZQUIERDA: form + tabla ---
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
 
-        layout.addWidget(QLabel("Buscar vuelos por origen o destino:"))
+        # Título
+        titulo = QLabel("Buscar y Reservar Vuelos")
+        titulo.setObjectName("titulo")
+        left_layout.addWidget(titulo, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        # Barra de búsqueda
-        search_layout = QHBoxLayout()
+        # Formulario búsqueda
+        busqueda_layout = QHBoxLayout()
+
+        origen_layout = QVBoxLayout()
+        origen_label = QLabel("Ciudad de origen")
         self.origen_input = QLineEdit()
-        self.origen_input.setPlaceholderText("Ciudad de origen")
+        self.origen_input.setPlaceholderText("Ej. Bogotá")
+        origen_layout.addWidget(origen_label)
+        origen_layout.addWidget(self.origen_input)
+
+        destino_layout = QVBoxLayout()
+        destino_label = QLabel("Ciudad de destino")
         self.destino_input = QLineEdit()
-        self.destino_input.setPlaceholderText("Ciudad de destino")
-        search_button = QPushButton("Buscar")
-        search_button.clicked.connect(self.buscar_vuelos)
+        self.destino_input.setPlaceholderText("Ej. Medellín")
+        destino_layout.addWidget(destino_label)
+        destino_layout.addWidget(self.destino_input)
 
-        search_layout.addWidget(self.origen_input)
-        search_layout.addWidget(self.destino_input)
-        search_layout.addWidget(search_button)
-        layout.addLayout(search_layout)
+        self.btn_buscar = QPushButton("🔍 Buscar")
+        self.btn_buscar.setFixedHeight(45)
+        self.btn_buscar.setFixedWidth(120)
+        self.btn_buscar.clicked.connect(self.buscar_vuelos)
 
-        # Tabla de resultados
+        busqueda_layout.addLayout(origen_layout)
+        busqueda_layout.addSpacing(15)
+        busqueda_layout.addLayout(destino_layout)
+        busqueda_layout.addSpacing(20)
+        busqueda_layout.addWidget(self.btn_buscar)
+
+        left_layout.addLayout(busqueda_layout)
+
+        # Tabla de vuelos
         self.tabla = QTableWidget()
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.setSortingEnabled(True)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        layout.addWidget(self.tabla)
-        
-        # Botón reservar
-        self.btn_reservar = QPushButton("Reservar vuelo seleccionado")
-        self.btn_reservar.clicked.connect(self.reservar_vuelo_seleccionado)
-        layout.addWidget(self.btn_reservar)
-        
-        self.btn_gestion_reservas = QPushButton("Gestionar Mis Reservas")
-        self.btn_gestion_reservas.clicked.connect(self.abrir_gestion_reservas)
-        layout.addWidget(self.btn_gestion_reservas)
+        self.tabla.setMinimumHeight(300)
+        left_layout.addWidget(self.tabla, stretch=1)
 
-        self.cargar_vuelos()  # mostrar todos al principio
+        # Botones inferiores
+        botones_layout = QHBoxLayout()
+        self.btn_reservar = QPushButton("✈️ Reservar vuelo seleccionado")
+        self.btn_reservar.clicked.connect(self.reservar_vuelo_seleccionado)
+        self.btn_gestion_reservas = QPushButton("📋 Gestionar mis reservas")
+        self.btn_gestion_reservas.clicked.connect(self.abrir_gestion_reservas)
+        botones_layout.addWidget(self.btn_reservar)
+        botones_layout.addWidget(self.btn_gestion_reservas)
+        left_layout.addLayout(botones_layout)
+
+ # --- DERECHA (IMAGEN) ---
+        right_widget = QLabel()
+        right_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Sube un nivel
+        imagen_path = os.path.join(BASE_DIR, "assets", "imagen_vista.jpg")
+        print("Ruta imagen:", imagen_path)
+        print("Existe archivo?", os.path.exists(imagen_path))
+
+        if os.path.exists(imagen_path):
+            pixmap = QPixmap(imagen_path)
+            if not pixmap.isNull():
+                # Escalar proporcionalmente al alto de la ventana
+                pixmap = pixmap.scaledToHeight(500, Qt.TransformationMode.SmoothTransformation)
+                right_widget.setPixmap(pixmap)
+            else:
+                right_widget.setText("❌ Imagen inválida")
+        else:
+            right_widget.setText("❌ Imagen no encontrada")
+
+        # Agregar widgets con proporción 1:1
+        main_layout.addWidget(left_widget, stretch=1)
+        main_layout.addWidget(right_widget, stretch=1)
+
+
+        # Estilos
+        self.setStyleSheet("""
+            QWidget {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background-color: #ffffff;
+                color: #0a3d62;
+            }
+
+            QLabel#titulo {
+                font-size: 28px;
+                font-weight: 700;
+                color: #2980b9;
+                margin-bottom: 20px;
+            }
+
+            QLabel {
+                font-size: 14px;
+                font-weight: 600;
+                color: #34495e;
+                margin-bottom: 6px;
+            }
+
+            QLineEdit {
+                padding: 8px 10px;
+                font-size: 14px;
+                border: 2px solid #aed6f1;
+                border-radius: 6px;
+                background-color: #ffffff;
+            }
+
+            QLineEdit:focus {
+                border-color: #2980b9;
+                background-color: #f0f8ff;
+            }
+
+            QPushButton {
+                background-color: #2980b9;
+                color: white;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 15px;
+                font-weight: 700;
+                border: none;
+                min-width: 140px;
+            }
+
+            QPushButton:hover {
+                background-color: #1c5980;
+            }
+
+            QPushButton:pressed {
+                background-color: #134563;
+            }
+
+            QTableWidget {
+                border: 1px solid #aed6f1;
+                border-radius: 8px;
+                background-color: #ffffff;
+                font-size: 14px;
+                color: #2c3e50;
+                gridline-color: #d6eaf8;
+            }
+
+            QHeaderView::section {
+                background-color: #2980b9;
+                color: white;
+                font-weight: 700;
+                padding: 8px;
+                border: none;
+            }
+
+            QTableWidget::item:selected {
+                background-color: #d6eaf8;
+                color: #154360;
+            }
+
+            QTableWidget::item:hover {
+                background-color: #ebf5fb;
+            }
+        """)
+
+        self.cargar_vuelos()
+
+
+
     
     def abrir_gestion_reservas(self):
          self.gestion_reservas_window = GestionReservas(self.documento_usuario)

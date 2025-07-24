@@ -11,6 +11,7 @@ import string
 
 
 
+
 class ReservaVuelo(QDialog):
     def __init__(self, usuario_documento, codigo_vuelo):
         super().__init__()
